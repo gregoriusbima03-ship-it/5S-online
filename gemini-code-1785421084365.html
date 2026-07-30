@@ -1,0 +1,574 @@
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5S SMA BENTARA WACANA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // ==========================================
+        // KONFIGURASI FIREBASE ANDA (Ubah di sini)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "GANTI_DENGAN_API_KEY_ANDA",
+            authDomain: "GANTI_DENGAN_AUTH_DOMAIN_ANDA",
+            databaseURL: "GANTI_DENGAN_DATABASE_URL_ANDA",
+            projectId: "GANTI_DENGAN_PROJECT_ID_ANDA",
+            storageBucket: "GANTI_DENGAN_STORAGE_BUCKET_ANDA",
+            messagingSenderId: "GANTI_DENGAN_MESSAGING_SENDER_ID_ANDA",
+            appId: "GANTI_DENGAN_APP_ID_ANDA"
+        };
+
+        // Inisialisasi Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Default initial data
+        const defaultClasses = [
+            {
+                id: 'class_x',
+                name: 'Kelas X',
+                students: [
+                    'Adit', 'Alif', 'vino', 'Brilian', 'Calvin', 'Dimas', 'Dion', 'Elisa',
+                    'Elysia', 'Felisha', 'Geshel', 'Helena', 'Kamila', 'Kanaka', 'Marsel',
+                    'Modesta', 'Nella', 'Pandu', 'Safa', 'Silverio', 'Steven', 'Vino'
+                ]
+            },
+            {
+                id: 'class_xi_hum',
+                name: 'Kelas XI Humaniora',
+                students: [
+                    'Caca', 'Cheyza', 'Fachri', 'Ignatia', 'Jojo', 'Jovan', 'Kevin', 'Lanna',
+                    'Michelle', 'Noel', 'Rara', 'Sayvina', 'Tia', 'Theo', 'Aga', 'Alve'
+                ]
+            },
+            {
+                id: 'class_xi_tek',
+                name: 'Kelas XI Teknik',
+                students: [
+                    'Alifah', 'Brenda', 'Budi', 'Dane', 'Gladys', 'Jessyca', 'Kianya', 'Lina', 'Naya'
+                ]
+            },
+            {
+                id: 'class_xii_f2_hum',
+                name: 'Kelas XII F2 Humaniora',
+                students: [
+                    'Abel', 'Ade', 'Agnes', 'Albert', 'Biel', 'Christian', 'Cicil', 'Cika' , 'Elfrand', 'Farrel', 'Luther', 'Mario', 'Rani', 'Rendy', 'Yemima'
+                ]
+            },
+            {
+                id: 'class_xii_f1_tek',
+                name: 'Kelas XII F1 Teknik',
+                students: [
+                  'Allina', 'Anggel', 'Ansel', 'Bima.', 'Christo', 'Fani', 'Gersom', 'Kasih', 'Kevin', 'Milkha' , 'Nicho'      
+                ]
+            }
+        ];
+
+        let classes = [];
+        let attendanceData = {};
+        let selectedClassId = '';
+        let currentDate = new Date().toISOString().split('T')[0];
+
+        // Sinkronisasi Realtime dari Firebase Database
+        function initRealtimeSync() {
+            // Sinkronisasi Data Kelas
+            onValue(ref(db, 'absensi_classes'), (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    classes = data;
+                } else {
+                    // Jika database masih kosong, isi dengan defaultClasses
+                    set(ref(db, 'absensi_classes'), defaultClasses);
+                    classes = defaultClasses;
+                }
+                if (!selectedClassId && classes.length > 0) {
+                    selectedClassId = classes[0].id;
+                }
+                renderUI();
+            });
+
+            // Sinkronisasi Data Absensi Kehadiran
+            onValue(ref(db, 'absensi_records'), (snapshot) => {
+                const data = snapshot.val();
+                attendanceData = data || {};
+                renderUI();
+            });
+        }
+
+        // Fungsi Simpan ke Firebase Database
+        function saveData() {
+            set(ref(db, 'absensi_classes'), classes);
+            set(ref(db, 'absensi_records'), attendanceData);
+        }
+
+        // Inisialisasi UI & Event Listener
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById('currentDate').value = currentDate;
+            document.getElementById('currentDate').addEventListener('change', (e) => {
+                currentDate = e.target.value;
+                renderUI();
+            });
+            initRealtimeSync();
+        });
+
+        window.switchTab = function(tab) {
+            document.getElementById('sectionAbsensi').classList.add('hidden');
+            document.getElementById('sectionKelola').classList.add('hidden');
+            document.getElementById('sectionExport').classList.add('hidden');
+            
+            document.getElementById('tabBtnAbsensi').className = "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all duration-300 text-slate-600 hover:bg-white/40";
+            document.getElementById('tabBtnKelola').className = "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all duration-300 text-slate-600 hover:bg-white/40";
+            document.getElementById('tabBtnExport').className = "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all duration-300 text-slate-600 hover:bg-white/40";
+
+            if(tab === 'absensi') {
+                document.getElementById('sectionAbsensi').classList.remove('hidden');
+                document.getElementById('tabBtnAbsensi').className = "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all duration-300 bg-white text-blue-700 shadow-md";
+            } else if(tab === 'kelola') {
+                document.getElementById('sectionKelola').classList.remove('hidden');
+                document.getElementById('tabBtnKelola').className = "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all duration-300 bg-white text-blue-700 shadow-md";
+            } else if(tab === 'export') {
+                document.getElementById('sectionExport').classList.remove('hidden');
+                document.getElementById('tabBtnExport').className = "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all duration-300 bg-white text-blue-700 shadow-md";
+            }
+            renderUI();
+            lucide.createIcons();
+        }
+
+        window.getCurrentTimeString = function() {
+            const now = new Date();
+            return now.toTimeString().slice(0, 5);
+        }
+
+        window.updateAttendance = function(studentName, field, value) {
+            if(!attendanceData[currentDate]) attendanceData[currentDate] = {};
+            if(!attendanceData[currentDate][selectedClassId]) attendanceData[currentDate][selectedClassId] = {};
+            if(!attendanceData[currentDate][selectedClassId][studentName]) attendanceData[currentDate][selectedClassId][studentName] = { time: '', s5: '' };
+            
+            attendanceData[currentDate][selectedClassId][studentName][field] = value;
+            saveData(); // Mengirim perubahan secara otomatis ke perangkat lain via Firebase
+        }
+
+        function renderUI() {
+            const pillsContainer = document.getElementById('classListPills');
+            if(!pillsContainer) return;
+            pillsContainer.innerHTML = '';
+            
+            classes.forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = `px-5 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap shadow-sm ${selectedClassId === c.id ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white scale-105 shadow-md' : 'bg-white/60 text-slate-600 hover:bg-white/90 border border-white/80'}`;
+                btn.innerText = c.name;
+                btn.onclick = () => {
+                    selectedClassId = c.id;
+                    renderUI();
+                };
+                pillsContainer.appendChild(btn);
+            });
+
+            let currentClass = classes.find(c => c.id === selectedClassId);
+            if(!currentClass && classes.length > 0) {
+                selectedClassId = classes[0].id;
+                currentClass = classes[0];
+            }
+
+            document.getElementById('totalStudentsBadge').innerText = `${currentClass ? currentClass.students.length : 0} Siswa Terdaftar`;
+            const exportLabel = document.getElementById('exportCurrentBtnLabel');
+            if(exportLabel) exportLabel.innerText = `Unduh ${currentClass ? currentClass.name : 'Kelas'}`;
+
+            const tbody = document.getElementById('attendanceTableBody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            if(currentClass && currentClass.students.length > 0) {
+                currentClass.students.forEach((student, index) => {
+                    const studentData = attendanceData[currentDate]?.[selectedClassId]?.[student] || { time: '', s5: '' };
+                    const isCheck = studentData.s5 === '✅';
+                    const isCross = studentData.s5 === '❌';
+                    const customVal = (!isCheck && !isCross) ? (studentData.s5 || '') : '';
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-white/30 transition-colors group";
+                    tr.innerHTML = `
+                        <td class="p-4 text-center text-slate-500 font-semibold">${index + 1}</td>
+                        <td class="p-4 font-bold text-slate-800 text-lg group-hover:text-blue-700 transition-colors">${student}</td>
+                        <td class="p-4">
+                            <div class="flex items-center gap-2">
+                                <input type="time" value="${studentData.time || ''}" onchange="updateAttendance('${student}', 'time', this.value)" class="border border-white/50 bg-white/50 backdrop-blur-md rounded-xl p-3 outline-none focus:ring-4 focus:ring-blue-400/30 transition-all font-bold text-slate-700 w-full shadow-inner">
+                                <button onclick="updateAttendance('${student}', 'time', getCurrentTimeString()); renderUI();" class="p-3.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-md hover:shadow-lg active:scale-90 transition-all" title="Gunakan Jam Sekarang">
+                                    <i data-lucide="clock" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td class="p-4">
+                            <div class="flex items-center gap-2 bg-white/40 p-1.5 rounded-2xl border border-white/50 w-full shadow-inner backdrop-blur-md">
+                                <button onclick="updateAttendance('${student}', 's5', '✅'); renderUI();" class="p-2.5 rounded-xl transition-all font-medium ${isCheck ? 'bg-emerald-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white/60'}" title="Lengkap (✅)">
+                                    <i data-lucide="check" class="w-5 h-5" stroke-width="3"></i>
+                                </button>
+                                <button onclick="updateAttendance('${student}', 's5', '❌'); renderUI();" class="p-2.5 rounded-xl transition-all font-medium ${isCross ? 'bg-rose-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white/60'}" title="Tidak Lengkap (❌)">
+                                    <i data-lucide="x" class="w-5 h-5" stroke-width="3"></i>
+                                </button>
+                                <input type="text" placeholder="Ket. lain" value="${customVal}" oninput="updateAttendance('${student}', 's5', this.value)" class="flex-1 min-w-[140px] bg-white/50 border border-white/60 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all">
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-500">Tidak ada data siswa.</td></tr>`;
+            }
+
+            renderManageView();
+            lucide.createIcons();
+        }
+
+        function renderManageView() {
+            const select = document.getElementById('manageClassSelect');
+            if(!select) return;
+            select.innerHTML = '';
+            
+            if(classes.length === 0) {
+                select.innerHTML = '<option value="">- Tidak ada kelas -</option>';
+                document.getElementById('editClassContainer').classList.add('hidden');
+                document.getElementById('studentListContainer').innerHTML = '';
+                return;
+            } else {
+                document.getElementById('editClassContainer').classList.remove('hidden');
+            }
+
+            classes.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.innerText = c.name;
+                if(c.id === selectedClassId) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            const currentClass = classes.find(c => c.id === selectedClassId) || classes[0];
+            if(currentClass) {
+                document.getElementById('currentClassNameLabel').innerText = currentClass.name;
+                document.getElementById('manageStudentsTitle').innerText = `Daftar Siswa (${currentClass.name})`;
+                document.getElementById('manageStudentsCountBadge').innerText = `${currentClass.students.length} Total`;
+
+                const container = document.getElementById('studentListContainer');
+                container.innerHTML = '';
+                currentClass.students.forEach(student => {
+                    const card = document.createElement('div');
+                    card.className = "flex justify-between items-center bg-white/60 p-4 rounded-2xl border border-white/85 shadow-sm hover:shadow-md transition-all group backdrop-blur-md";
+                    card.innerHTML = `
+                        <span class="text-slate-800 font-bold group-hover:text-blue-700 transition-colors">${student}</span>
+                        <button onclick="removeStudent('${student}')" class="text-rose-400 p-2 hover:bg-rose-500 hover:text-white rounded-xl transition-all opacity-0 group-hover:opacity-100 bg-white shadow-sm border border-rose-100" title="Hapus Siswa">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+        }
+
+        window.onManageClassChange = function(id) {
+            selectedClassId = id;
+            window.cancelEditClassName();
+            renderUI();
+        }
+
+        window.enableEditClassName = function() {
+            document.getElementById('editClassViewMode').classList.add('hidden');
+            document.getElementById('editClassEditMode').classList.remove('hidden');
+            const currentClass = classes.find(c => c.id === selectedClassId);
+            if(currentClass) {
+                document.getElementById('inputEditClassName').value = currentClass.name;
+            }
+        }
+
+        window.cancelEditClassName = function() {
+            document.getElementById('editClassViewMode').classList.remove('hidden');
+            document.getElementById('editClassEditMode').classList.add('hidden');
+        }
+
+        window.saveClassName = function() {
+            const newName = document.getElementById('inputEditClassName').value.trim();
+            if(!newName) return;
+            classes = classes.map(c => c.id === selectedClassId ? { ...c, name: newName } : c);
+            saveData();
+            window.cancelEditClassName();
+            renderUI();
+        }
+
+        window.addNewClass = function() {
+            const input = document.getElementById('inputNewClassName');
+            const name = input.value.trim();
+            if(!name) return;
+            const newId = 'class_' + Date.now();
+            classes.push({ id: newId, name: name, students: [] });
+            input.value = '';
+            selectedClassId = newId;
+            saveData();
+            renderUI();
+        }
+
+        window.removeCurrentClass = function() {
+            const currentClass = classes.find(c => c.id === selectedClassId);
+            if(!currentClass) return;
+            if(!confirm(`Apakah Anda yakin ingin menghapus ${currentClass.name} beserta seluruh siswanya?`)) return;
+
+            classes = classes.filter(c => c.id !== selectedClassId);
+            if(classes.length > 0) {
+                selectedClassId = classes[0].id;
+            } else {
+                selectedClassId = '';
+            }
+            saveData();
+            renderUI();
+        }
+
+        window.addNewStudent = function() {
+            const input = document.getElementById('inputNewStudentName');
+            const name = input.value.trim();
+            if(!name || !selectedClassId) return;
+
+            classes = classes.map(c => {
+                if(c.id === selectedClassId) {
+                    return { ...c, students: [...c.students, name].sort() };
+                }
+                return c;
+            });
+            input.value = '';
+            saveData();
+            renderUI();
+        }
+
+        window.removeStudent = function(studentName) {
+            const currentClass = classes.find(c => c.id === selectedClassId);
+            if(!confirm(`Hapus ${studentName} dari ${currentClass.name}?`)) return;
+
+            classes = classes.map(c => {
+                if(c.id === selectedClassId) {
+                    return { ...c, students: c.students.filter(s => s !== studentName) };
+                }
+                return c;
+            });
+            saveData();
+            renderUI();
+        }
+
+        window.exportCurrentClassCSV = function() {
+            const currentClass = classes.find(c => c.id === selectedClassId);
+            if(!currentClass) return;
+
+            const dateData = attendanceData[currentDate] || {};
+            const classData = dateData[selectedClassId] || {};
+
+            let csvContent = "Tanggal,Kelas,No,Nama,Jam Kedatangan,Keterangan 5S\n";
+            currentClass.students.forEach((student, index) => {
+                const data = classData[student] || { time: '-', s5: '-' };
+                const row = [currentDate, currentClass.name, index + 1, student, data.time || '-', data.s5 || '-'].join(",");
+                csvContent += row + "\n";
+            });
+
+            downloadCSV(csvContent, `Absensi_${currentClass.name}_${currentDate}.csv`);
+        }
+
+        window.exportAllClassesCSV = function() {
+            let csvContent = "Tanggal,Kelas,No,Nama,Jam Kedatangan,Keterangan 5S\n";
+
+            classes.forEach(cls => {
+                const classData = attendanceData[currentDate]?.[cls.id] || {};
+                cls.students.forEach((student, index) => {
+                    const data = classData[student] || { time: '-', s5: '-' };
+                    const row = [currentDate, cls.name, index + 1, student, data.time || '-', data.s5 || '-'].join(",");
+                    csvContent += row + "\n";
+                });
+            });
+
+            downloadCSV(csvContent, `Rekap_Absensi_Semua_Kelas_${currentDate}.csv`);
+        }
+
+        function downloadCSV(content, filename) {
+            const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-300 via-indigo-200 to-cyan-200 text-slate-800 relative overflow-x-hidden selection:bg-blue-400 selection:text-white">
+
+    <div class="fixed top-[-10%] left-[-10%] w-96 h-96 bg-blue-400/50 rounded-full mix-blend-multiply filter blur-[100px] animate-pulse pointer-events-none"></div>
+    <div class="fixed top-[20%] right-[-10%] w-[30rem] h-[30rem] bg-indigo-300/50 rounded-full mix-blend-multiply filter blur-[120px] animate-pulse pointer-events-none" style="animation-delay: 2s;"></div>
+    <div class="fixed bottom-[-10%] left-[20%] w-[25rem] h-[25rem] bg-cyan-300/50 rounded-full mix-blend-multiply filter blur-[100px] animate-pulse pointer-events-none" style="animation-delay: 4s;"></div>
+
+    <div class="relative z-10 max-w-6xl mx-auto p-4 min-h-screen flex flex-col">
+        
+        <header class="bg-white/40 backdrop-blur-2xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-4 rounded-3xl mt-2 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-2xl shadow-lg flex items-center justify-center text-white">
+                    <i data-lucide="calendar" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-extrabold tracking-tight text-slate-800">5S SMA BENTARA WACANA</h1>
+                    <p class="text-slate-500 font-medium text-sm tracking-wide">Absensi (Real-time Sync)</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 bg-white/50 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/60 shadow-sm">
+                <span class="text-sm font-semibold text-slate-600">Tanggal:</span>
+                <input type="date" id="currentDate" class="bg-transparent text-blue-700 font-bold border-none focus:ring-0 cursor-pointer outline-none">
+            </div>
+        </header>
+
+        <div class="flex p-1.5 space-x-1 bg-white/30 backdrop-blur-xl rounded-[1.25rem] border border-white/50 shadow-sm w-full md:w-max mx-auto mb-8">
+            <button onclick="switchTab('absensi')" id="tabBtnAbsensi" class="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all duration-300 bg-white text-blue-700 shadow-md">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>Absensi</span>
+            </button>
+            <button onclick="switchTab('kelola')" id="tabBtnKelola" class="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all duration-300 text-slate-600 hover:bg-white/40">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+                <span>Kelas</span>
+            </button>
+            <button onclick="switchTab('export')" id="tabBtnExport" class="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all duration-300 text-slate-600 hover:bg-white/40">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Export</span>
+            </button>
+        </div>
+
+        <main class="flex-1">
+            
+            <div id="sectionAbsensi" class="bg-white/40 backdrop-blur-2xl rounded-[2rem] shadow-[0_8px_40px_rgb(0,0,0,0.06)] border border-white/60 overflow-hidden flex flex-col">
+                <div class="p-6 border-b border-white/50 flex flex-col gap-4 bg-white/20">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="bg-blue-600 p-2 rounded-xl shadow-md text-white">
+                            <i data-lucide="users" class="w-5 h-5"></i>
+                        </div>
+                        <span class="font-bold text-slate-700">Pilih Kelas:</span>
+                    </div>
+                    <div id="classListPills" class="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+                        </div>
+                    <div id="totalStudentsBadge" class="bg-white/50 backdrop-blur-md border border-white/60 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm w-max">
+                        0 Siswa Terdaftar
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto p-2">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-white/40">
+                                <th class="p-5 w-16 text-center">No</th>
+                                <th class="p-5">Nama Siswa</th>
+                                <th class="p-5 w-60">Jam Masuk</th>
+                                <th class="p-5 w-72 text-center">Status 5S & Keterangan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTableBody" class="divide-y divide-white/30">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="sectionKelola" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="md:col-span-1 flex flex-col gap-6">
+                    <div class="bg-white/40 backdrop-blur-2xl rounded-[2rem] shadow-sm border border-white/60 p-6">
+                        <div class="flex items-center gap-3 border-b border-white/40 pb-4 mb-4">
+                            <div class="p-2 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl text-white shadow-md">
+                                <i data-lucide="settings" class="w-5 h-5"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-slate-800">Pengaturan Kelas</h3>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-slate-600 mb-2">Pilih Kelas:</label>
+                            <select id="manageClassSelect" onchange="onManageClassChange(this.value)" class="w-full bg-white/60 backdrop-blur-md border border-white/80 rounded-xl p-3 focus:ring-4 focus:ring-indigo-400/30 outline-none font-bold text-slate-800 shadow-sm transition-all appearance-none cursor-pointer">
+                                </select>
+                        </div>
+
+                        <div id="editClassContainer" class="pt-4 mt-2">
+                            <label class="block text-sm font-bold text-slate-600 mb-2">Edit Nama Kelas:</label>
+                            <div id="editClassViewMode" class="flex justify-between items-center bg-white/50 border border-white/60 p-3.5 rounded-xl shadow-sm mb-4">
+                                <span id="currentClassNameLabel" class="font-extrabold text-indigo-900">-</span>
+                                <button onclick="enableEditClassName()" class="p-2 bg-white text-indigo-600 rounded-lg shadow-sm hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100" title="Edit Nama Kelas">
+                                    <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <div id="editClassEditMode" class="hidden flex gap-2 mb-4">
+                                <input type="text" id="inputEditClassName" class="w-full bg-white/70 border border-white/80 rounded-xl p-3 font-bold text-slate-800 focus:ring-4 focus:ring-indigo-400/30 outline-none shadow-inner">
+                                <button onclick="saveClassName()" class="p-3 bg-emerald-500 text-white rounded-xl shadow-md hover:bg-emerald-600 active:scale-95 transition-all">
+                                    <i data-lucide="save" class="w-5 h-5"></i>
+                                </button>
+                                <button onclick="cancelEditClassName()" class="p-3 bg-white/50 text-slate-600 rounded-xl shadow-sm hover:bg-white/80 border border-white/50 active:scale-95 transition-all">
+                                    <i data-lucide="x" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                            
+                            <button onclick="removeCurrentClass()" class="w-full flex items-center justify-center gap-2 bg-rose-100/50 hover:bg-rose-500 text-rose-600 hover:text-white px-4 py-3 rounded-xl transition-all font-bold shadow-sm">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus Kelas Ini
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/40 backdrop-blur-2xl rounded-[2rem] shadow-sm border border-white/60 p-6">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4">Tambah Kelas Baru</h3>
+                        <div class="flex flex-col gap-3">
+                            <input type="text" id="inputNewClassName" placeholder="Nama kelas baru..." class="bg-white/60 border border-white/80 rounded-xl px-4 py-3 focus:outline-none focus:ring-4 focus:ring-indigo-400/30 text-slate-800 font-bold">
+                            <button onclick="addNewClass()" class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+                                <i data-lucide="plus" class="w-5 h-5"></i> Buat Kelas
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="md:col-span-2 bg-white/40 backdrop-blur-2xl rounded-[2rem] shadow-sm border border-white/60 p-6 flex flex-col">
+                    <div class="flex justify-between items-center mb-6 pb-4 border-b border-white/40">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl text-white shadow-md">
+                                <i data-lucide="users" class="w-5 h-5"></i>
+                            </div>
+                            <h3 id="manageStudentsTitle" class="text-xl font-bold text-slate-800">Daftar Siswa</h3>
+                        </div>
+                        <span id="manageStudentsCountBadge" class="bg-white/60 border border-white/80 text-blue-800 text-sm font-extrabold px-4 py-1.5 rounded-full shadow-sm">
+                            0 Total
+                        </span>
+                    </div>
+                    
+                    <div class="flex gap-3 mb-6 bg-white/50 p-2 rounded-2xl border border-white/60 shadow-inner">
+                        <input type="text" id="inputNewStudentName" placeholder="Ketik nama siswa baru di sini..." class="flex-1 bg-transparent border-none px-4 py-2 focus:ring-0 outline-none text-slate-800 font-bold placeholder-slate-500">
+                        <button onclick="addNewStudent()" class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all font-bold flex items-center gap-2">
+                            <i data-lucide="plus" class="w-5 h-5" stroke-width="3"></i> Tambah
+                        </button>
+                    </div>
+
+                    <div id="studentListContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto pr-2" style="max-height: calc(100vh - 400px);">
+                        </div>
+                </div>
+            </div>
+
+            <div id="sectionExport" class="hidden bg-white/40 backdrop-blur-2xl rounded-[2rem] shadow-[0_8px_40px_rgb(0,0,0,0.06)] border border-white/60 p-12 flex flex-col items-center justify-center min-h-[500px] text-center relative overflow-hidden">
+                <div class="w-28 h-28 bg-gradient-to-tr from-emerald-400 to-teal-400 rounded-3xl shadow-xl flex items-center justify-center mb-8 text-white rotate-3 transition-transform duration-300">
+                    <i data-lucide="download" class="w-14 h-14" stroke-width="2.5"></i>
+                </div>
+                <h2 class="text-4xl font-extrabold text-slate-800 mb-4 tracking-tight">Siap Diekspor</h2>
+                <p class="text-slate-600 mb-10 max-w-lg text-lg leading-relaxed font-medium">
+                    Pilih opsi di bawah ini untuk mengunduh data absensi Anda dalam format CSV untuk Spreadsheet/Excel.
+                </p>
+                
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <button onclick="exportCurrentClassCSV()" class="group flex items-center justify-center gap-3 bg-white/60 border border-white/80 hover:bg-white text-emerald-700 px-8 py-4 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95 text-lg">
+                        <i data-lucide="download" class="w-6 h-6 transition-transform"></i>
+                        <span id="exportCurrentBtnLabel">Unduh Kelas Aktif</span>
+                    </button>
+
+                    <button onclick="exportAllClassesCSV()" class="group flex items-center justify-center gap-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-8 py-4 rounded-2xl font-bold shadow-[0_10px_20px_rgba(16,185,129,0.3)] transition-all active:scale-95 text-lg">
+                        <i data-lucide="download" class="w-6 h-6 transition-transform"></i>
+                        Unduh Rekap Semua Kelas
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</body>
+</html>
