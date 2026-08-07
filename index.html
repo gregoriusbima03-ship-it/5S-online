@@ -14,7 +14,10 @@
             touch-action: manipulation; 
         }
 
- 
+        body.dark {
+            color: #e5e7eb;
+        }
+
         .custom-scrollbar::-webkit-scrollbar {
             height: 4px;
             width: 4px;
@@ -27,10 +30,50 @@
             border-radius: 4px;
         }
 
-      
+        .dark .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
         .hardware-accelerated {
             transform: translateZ(0);
             will-change: transform;
+        }
+
+        .dark .bg-white\/60,
+        .dark .bg-white\/50,
+        .dark .bg-white\/40,
+        .dark .bg-white\/70,
+        .dark .bg-white\/80 {
+            background-color: rgba(15, 23, 42, 0.65) !important;
+        }
+
+        .dark .text-slate-800,
+        .dark .text-slate-700,
+        .dark .text-slate-600,
+        .dark .text-slate-500 {
+            color: #e5e7eb !important;
+        }
+
+        .dark .border-white\/60,
+        .dark .border-white\/70,
+        .dark .border-white\/80,
+        .dark .border-white\/40 {
+            border-color: rgba(255, 255, 255, 0.12) !important;
+        }
+
+        .dark .bg-blue-300,
+        .dark .bg-indigo-200,
+        .dark .bg-cyan-200 {
+            opacity: 0.15;
+        }
+
+        .dark .shadow-sm,
+        .dark .shadow-md,
+        .dark .shadow-lg {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
         }
     </style>
 </head>
@@ -51,9 +94,14 @@
                     <p class="text-slate-500 font-medium text-xs sm:text-sm">Absen</p>
                 </div>
             </div>
-            <div class="flex items-center justify-between sm:justify-end gap-2 bg-white/70 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-white/80 shadow-sm w-full sm:w-auto">
-                <span class="text-xs sm:text-sm font-semibold text-slate-600">Tanggal:</span>
-                <input type="date" id="currentDate" class="bg-transparent text-blue-700 font-bold text-sm border-none focus:ring-0 cursor-pointer outline-none">
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <div class="flex items-center justify-between sm:justify-end gap-2 bg-white/70 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-white/80 shadow-sm w-full sm:w-auto">
+                    <span class="text-xs sm:text-sm font-semibold text-slate-600">Tanggal:</span>
+                    <input type="date" id="currentDate" class="bg-transparent text-blue-700 font-bold text-sm border-none focus:ring-0 cursor-pointer outline-none">
+                </div>
+                <button onclick="toggleTheme()" id="themeToggleBtn" class="p-2.5 rounded-xl bg-white/70 border border-white/80 shadow-sm text-slate-700 hover:bg-white/90">
+                    <i data-lucide="moon-star" class="w-4 h-4"></i>
+                </button>
             </div>
         </header>
 
@@ -236,10 +284,33 @@
 
         let selectedClassId = classes.length > 0 ? classes[0].id : '';
         let currentDate = new Date().toISOString().split('T')[0];
+        let darkMode = JSON.parse(localStorage.getItem('absensi_dark_mode')) || false;
 
         function saveData() {
             localStorage.setItem('absensi_classes', JSON.stringify(classes));
             localStorage.setItem('absensi_records', JSON.stringify(attendanceData));
+            localStorage.setItem('absensi_dark_mode', JSON.stringify(darkMode));
+        }
+
+        function applyTheme() {
+            document.body.classList.toggle('dark', darkMode);
+            document.body.className = darkMode
+                ? 'min-h-screen bg-slate-950 text-slate-100 relative overflow-x-hidden selection:bg-blue-400 selection:text-white dark'
+                : 'min-h-screen bg-gradient-to-br from-blue-300 via-indigo-200 to-cyan-200 text-slate-800 relative overflow-x-hidden selection:bg-blue-400 selection:text-white';
+
+            const btn = document.getElementById('themeToggleBtn');
+            if (btn) {
+                btn.innerHTML = darkMode
+                    ? '<i data-lucide="sun-medium" class="w-4 h-4"></i>'
+                    : '<i data-lucide="moon-star" class="w-4 h-4"></i>';
+            }
+        }
+
+        function toggleTheme() {
+            darkMode = !darkMode;
+            saveData();
+            applyTheme();
+            lucide.createIcons();
         }
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -249,6 +320,7 @@
                 currentDate = e.target.value;
                 renderUI();
             });
+            applyTheme();
             renderUI();
         });
 
@@ -284,9 +356,17 @@
             if(!attendanceData[currentDate]) attendanceData[currentDate] = {};
             if(!attendanceData[currentDate][selectedClassId]) attendanceData[currentDate][selectedClassId] = {};
             if(!attendanceData[currentDate][selectedClassId][studentName]) {
-                attendanceData[currentDate][selectedClassId][studentName] = { time: '', s5: '' };
+                attendanceData[currentDate][selectedClassId][studentName] = { time: '', s5: '', note: '' };
             }
-            attendanceData[currentDate][selectedClassId][studentName][field] = value;
+
+            if (field === 's5') {
+                attendanceData[currentDate][selectedClassId][studentName].s5 = value;
+            } else if (field === 'note') {
+                attendanceData[currentDate][selectedClassId][studentName].note = value;
+            } else {
+                attendanceData[currentDate][selectedClassId][studentName][field] = value;
+            }
+
             saveData();
         }
 
@@ -319,10 +399,11 @@
 
             if(currentClass && currentClass.students.length > 0) {
                 currentClass.students.forEach((student, index) => {
-                    const studentData = attendanceData[currentDate]?.[selectedClassId]?.[student] || { time: '', s5: '' };
-                    const isCheck = studentData.s5 === '✅';
-                    const isCross = studentData.s5 === '❌';
-                    const customVal = (!isCheck && !isCross) ? (studentData.s5 || '') : '';
+                    const studentData = attendanceData[currentDate]?.[selectedClassId]?.[student] || { time: '', s5: '', note: '' };
+                    const s5Value = studentData.s5 || '';
+                    const isCheck = s5Value === '✅';
+                    const isCross = s5Value === '❌';
+                    const noteValue = studentData.note || '';
 
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-white/20 transition-colors";
@@ -345,7 +426,7 @@
                                 <button onclick="updateAttendance('${student}', 's5', '❌'); renderUI();" class="p-2 rounded-lg transition-all ${isCross ? 'bg-rose-500 text-white shadow' : 'text-slate-500 hover:bg-white/60'}" title="Tidak Lengkap">
                                     <i data-lucide="x" class="w-4 h-4" stroke-width="3"></i>
                                 </button>
-                                <input type="text" placeholder="Ket..." value="${customVal}" oninput="updateAttendance('${student}', 's5', this.value)" class="flex-1 min-w-[80px] bg-white/70 border border-white/80 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none">
+                                <input type="text" placeholder="Ket..." value="${noteValue}" oninput="updateAttendance('${student}', 'note', this.value)" class="flex-1 min-w-[80px] bg-white/70 border border-white/80 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none">
                             </div>
                         </td>
                     `;
@@ -488,21 +569,21 @@
             const dateData = attendanceData[currentDate] || {};
             const classData = dateData[selectedClassId] || {};
 
-            let csvContent = "Tanggal,Kelas,No,Nama,Jam Kedatangan,Keterangan 5S\n";
+            let csvContent = "Tanggal,Kelas,No,Nama,Jam Kedatangan,Status 5S,Keterangan\n";
             currentClass.students.forEach((student, index) => {
-                const data = classData[student] || { time: '-', s5: '-' };
-                csvContent += [currentDate, currentClass.name, index + 1, student, data.time || '-', data.s5 || '-'].join(",") + "\n";
+                const data = classData[student] || { time: '-', s5: '-', note: '' };
+                csvContent += [currentDate, currentClass.name, index + 1, student, data.time || '-', data.s5 || '-', data.note || '-'].join(",") + "\n";
             });
             downloadCSV(csvContent, `Absensi_${currentClass.name}_${currentDate}.csv`);
         }
 
         function exportAllClassesCSV() {
-            let csvContent = "Tanggal,Kelas,No,Nama,Jam Kedatangan,Keterangan 5S\n";
+            let csvContent = "Tanggal,Kelas,No,Nama,Jam Kedatangan,Status 5S,Keterangan\n";
             classes.forEach(cls => {
                 const classData = attendanceData[currentDate]?.[cls.id] || {};
                 cls.students.forEach((student, index) => {
-                    const data = classData[student] || { time: '-', s5: '-' };
-                    csvContent += [currentDate, cls.name, index + 1, student, data.time || '-', data.s5 || '-'].join(",") + "\n";
+                    const data = classData[student] || { time: '-', s5: '-', note: '' };
+                    csvContent += [currentDate, cls.name, index + 1, student, data.time || '-', data.s5 || '-', data.note || '-'].join(",") + "\n";
                 });
             });
             downloadCSV(csvContent, `Rekap_Absensi_Semua_Kelas_${currentDate}.csv`);
